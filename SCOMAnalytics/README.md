@@ -1,5 +1,5 @@
 # SCOM Analytics Solutions
-# Release\ DEMO Azure Analytics Management Pack
+##  DEMO Azure Analytics Management Pack
 
 
 
