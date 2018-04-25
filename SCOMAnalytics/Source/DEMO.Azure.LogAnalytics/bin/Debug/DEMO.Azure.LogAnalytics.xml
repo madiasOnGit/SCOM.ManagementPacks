@@ -1,0 +1,413 @@
+﻿<?xml version="1.0" encoding="utf-8"?><ManagementPack xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsl="http://www.w3.org/1999/XSL/Transform" ContentReadable="true" SchemaVersion="2.0" OriginalSchemaVersion="2.0">
+  <Manifest>
+    <Identity>
+      <ID>DEMO.Azure.LogAnalytics</ID>
+      <Version>1.0.0.58</Version>
+    </Identity>
+    <Name>DEMO Azure Log Analytics</Name>
+    <References>
+      <Reference Alias="SC">
+        <ID>Microsoft.SystemCenter.Library</ID>
+        <Version>7.0.8433.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="Windows">
+        <ID>Microsoft.Windows.Library</ID>
+        <Version>7.5.8501.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="System">
+        <ID>System.Library</ID>
+        <Version>7.5.8501.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+    </References>
+  </Manifest>
+  <TypeDefinitions>
+    <EntityTypes>
+      <ClassTypes>
+        <ClassType ID="DEMO.Azure.LogAnalytics.Workspace" Accessibility="Public" Abstract="false" Base="System!System.LogicalEntity" Hosted="false" Singleton="false" Extension="false">
+          <Property ID="Tenant" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="SubscriptionId" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="ResourceGroup" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="WorkspaceName" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+        </ClassType>
+        <ClassType ID="DEMO.Azure.LogAnalytics.ManagedDevice" Accessibility="Public" Abstract="false" Base="System!System.ApplicationComponent" Hosted="true" Singleton="false" Extension="false">
+          <Property ID="DeviceName" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+        </ClassType>
+        <ClassType ID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" Accessibility="Public" Abstract="false" Base="DEMO.Azure.LogAnalytics.ManagedDevice" Hosted="true" Singleton="false" Extension="false">
+          <Property ID="IsSCOMManaged" Type="bool" AutoIncrement="false" Key="false" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="OSType" Type="string" AutoIncrement="false" Key="false" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="RemoteIPCountry" Type="string" AutoIncrement="false" Key="false" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+        </ClassType>
+        <ClassType ID="DEMO.Azure.LogAnalytics.Pool" Accessibility="Public" Abstract="false" Base="SC!Microsoft.SystemCenter.ManagementServicePool" Hosted="false" Singleton="true" Extension="false" />
+      </ClassTypes>
+      <RelationshipTypes>
+        <RelationshipType ID="DEMO.Azure.LogAnalytics.Workspace.Hosts.ManagedDevices" Accessibility="Public" Abstract="false" Base="System!System.Hosting">
+          <Source ID="Source" MinCardinality="0" MaxCardinality="2147483647" Type="DEMO.Azure.LogAnalytics.Workspace" />
+          <Target ID="Target" MinCardinality="0" MaxCardinality="2147483647" Type="DEMO.Azure.LogAnalytics.ManagedDevice" />
+        </RelationshipType>
+      </RelationshipTypes>
+    </EntityTypes>
+    <SecureReferences>
+      <SecureReference ID="DEMO.Azure.LogAnalytics.RunAsProfile" Accessibility="Public" Context="DEMO.Azure.LogAnalytics.Workspace" />
+    </SecureReferences>
+    <ModuleTypes>
+      <DataSourceModuleType ID="DEMO.Azure.LogAnalytics.PoolWatcher.Discovery.DS" Accessibility="Public" Batching="false">
+        <Configuration><xsd:element xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="IntervalSeconds" type="xsd:integer" /></Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.Discovery.Scheduler"><Scheduler><SimpleReccuringSchedule><Interval>$Config/IntervalSeconds$</Interval><SyncTime /></SimpleReccuringSchedule><ExcludeDates /></Scheduler></DataSource>
+              <ConditionDetection ID="Mapper" TypeID="System!System.Discovery.ClassSnapshotDataMapper"><ClassId>$MPElement[Name="SC!Microsoft.SystemCenter.ManagementServicePoolWatcher"]$</ClassId><InstanceSettings><Settings><Setting><Name>$MPElement[Name="SC!Microsoft.SystemCenter.ManagementServicePoolWatcher"]/PoolId$</Name><Value>$Target/Id$</Value></Setting><Setting><Name>$MPElement[Name="SC!Microsoft.SystemCenter.ManagementServicePoolWatcher"]/PoolName$</Name><Value>$Target/Property[Type="System!System.Entity"]/DisplayName$</Value></Setting><Setting><Name>$MPElement[Name="System!System.Entity"]/DisplayName$</Name><Value>$Target/Property[Type="System!System.Entity"]/DisplayName$ Watcher</Value></Setting></Settings></InstanceSettings></ConditionDetection>
+            </MemberModules>
+            <Composition>
+              <Node ID="Mapper">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.Discovery.Data</OutputType>
+      </DataSourceModuleType>
+      <DataSourceModuleType ID="DEMO.Azure.LogAnalytics.Workspaces.Discovery.DS" Accessibility="Public" Batching="false">
+        <Configuration><xsd:element xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="IntervalSeconds" type="xsd:integer" /><xsd:element xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="Configuration" type="xsd:string" /></Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="Configuration" Selector="$Config/Configuration$" ParameterType="string" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.TimedPowerShell.DiscoveryProvider"><IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds><SyncTime /><ScriptName>discoverWorspaces.ps1</ScriptName><ScriptBody>param($Configuration)
+
+$oAPI = New-Object -ComObject 'MOM.ScriptAPI'
+$oDiscoveryData = $oAPI.CreateDiscoveryData(0, '$MPElement$', '$Target/Id$')
+
+function ConvertFrom-Json20([object] $item){ 
+    add-type -assembly system.web.extensions
+    $ps_js=new-object system.web.script.serialization.javascriptSerializer
+    return ,$ps_js.DeserializeObject($item)
+}
+
+$Config = ConvertFrom-Json20 $Configuration
+
+$Config | %{ 
+	$instance = $oDiscoveryData.CreateClassInstance("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']$")
+	$instance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/Tenant$", $_.Tenant)
+	$instance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/SubscriptionId$", $_.SubscriptionId)
+	$instance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/ResourceGroup$", $_.ResourceGroup)
+	$instance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/WorkspaceName$", $_.WorkspaceName)
+	$instance.AddProperty("$MPElement[Name='System!System.Entity']/DisplayName$", "Azure Log Analytics $($_.WorkspaceName)")
+	$oDiscoveryData.AddInstance($instance)
+
+}
+
+$oDiscoveryData
+</ScriptBody><Parameters><Parameter><Name>Configuration</Name><Value>$Config/Configuration$</Value></Parameter></Parameters><TimeoutSeconds>300</TimeoutSeconds></DataSource>
+            </MemberModules>
+            <Composition>
+              <Node ID="DS" />
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.Discovery.Data</OutputType>
+      </DataSourceModuleType>
+    </ModuleTypes>
+  </TypeDefinitions>
+  <Monitoring>
+    <Discoveries>
+      <Discovery ID="DEMO.Azure.LogAnalytics.ComputerManagedDevice.Discovery" Enabled="true" Target="DEMO.Azure.LogAnalytics.Workspace" ConfirmDelivery="true" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryClass TypeID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" />
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.TimedPowerShell.DiscoveryProvider"><IntervalSeconds>900</IntervalSeconds><SyncTime /><ScriptName>discoverComputerManagedDevice.ps1</ScriptName><ScriptBody>Param($ServiceAccountUser, $ServiceAccountPassword,$Tenant,$SubscriptionId,$ResourceGroup,$WorkspaceName)
+
+$ScriptName = "discoverComputerManagedDevice.ps1"
+$EventID = "11115"
+$oAPI = New-Object -ComObject 'MOM.ScriptAPI'
+$oDiscoveryData = $oAPI.CreateDiscoveryData(0, '$MPElement$', '$Target/Id$')
+$sw = New-Object Diagnostics.Stopwatch
+$sw.Start()
+#$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Script is starting.`n Running as $(whoami).`n WS=$WorkspaceName , AppID=$ServiceAccountUser")
+
+#Functions from LogAnalytics Module
+function Invoke-LogAnalyticsQuery ($WorkspaceName,$SubscriptionId,$ResourceGroup,$Query){
+
+    $ErrorActionPreference = "Stop"
+    $accessToken = GetAccessToken
+	$uri =  "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/microsoft.operationalinsights/workspaces/$workspaceName/api/query?api-version=2017-01-01-preview"
+	$Timespan = ""
+	$ServerTimeout = ""
+
+    $body = @{"query" = $Query;"timespan" = $Timespan} | ConvertTo-Json
+
+	$preferString = "response-v1=true"
+    if ($ServerTimeout -ne $null) {
+        $preferString += ",wait=$ServerTimeout"
+    }
+	$headers = @{
+        "Authorization" = "Bearer $accessToken";
+        "prefer" = $preferString;
+        "x-ms-app" = "LogAnalyticsQuery.psm1";
+        "x-ms-client-request-id" = [Guid]::NewGuid().ToString();
+    }
+
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $uri -Body $body -ContentType "application/json" -Headers $headers -Method Post
+
+    if ($response.StatusCode -ne 200 -and $response.StatusCode -ne 204) {
+        $statusCode = $response.StatusCode
+        $reasonPhrase = $response.StatusDescription
+        $message = $response.Content
+        throw "Failed to execute query.`nStatus Code: $statusCode`nReason: $reasonPhrase`nMessage: $message"
+    }
+
+    $oData = $response.Content | ConvertFrom-Json
+
+    $result = New-Object PSObject
+    $result | Add-Member -MemberType NoteProperty -Name Response -Value $response
+
+    # In this case, we only need the response member set and we can bail out
+    if ($response.StatusCode -eq 204) {
+        $result
+        return
+    }
+
+    $objectView = CreateObjectView  $oData
+    $result | Add-Member -MemberType NoteProperty -Name Results -Value $objectView
+    $result
+}
+
+function GetAccessToken {
+    $azureCmdlet = get-command -Name Get-AzureRMContext -ErrorAction SilentlyContinue
+    if ($azureCmdlet -eq $null)
+    {
+        $null = Import-Module AzureRM -ErrorAction Stop;
+    }
+    $AzureContext = &amp; "Get-AzureRmContext" -ErrorAction Stop;
+    $authenticationFactory = New-Object -TypeName Microsoft.Azure.Commands.Common.Authentication.Factories.AuthenticationFactory
+    if ((Get-Variable -Name PSEdition -ErrorAction Ignore) -and ('Core' -eq $PSEdition)) {
+        [Action[string]]$stringAction = {param($s)}
+        $serviceCredentials = $authenticationFactory.GetServiceClientCredentials($AzureContext, $stringAction)
+    } else {
+        $serviceCredentials = $authenticationFactory.GetServiceClientCredentials($AzureContext)
+    }
+
+    # We can't get a token directly from the service credentials. Instead, we need to make a dummy message which we will ask
+    # the serviceCredentials to add an auth token to, then we can take the token from this message.
+    $message = New-Object System.Net.Http.HttpRequestMessage -ArgumentList @([System.Net.Http.HttpMethod]::Get, "http://foobar/")
+    $cancellationToken = New-Object System.Threading.CancellationToken
+    $null = $serviceCredentials.ProcessHttpRequestAsync($message, $cancellationToken).GetAwaiter().GetResult()
+    $accessToken = $message.Headers.GetValues("Authorization").Split(" ")[1] # This comes out in the form "Bearer &lt;token&gt;"
+
+    $accessToken
+}
+
+function CreateObjectView($oData) {
+
+    # Find the number of entries we'll need in this array
+    $count = 0
+    foreach ($table in $oData.Tables) {
+        $count += $table.Rows.Count
+    }
+
+    $objectView = New-Object object[] $count
+    $i = 0;
+    foreach ($table in $oData.Tables) {
+        foreach ($row in $table.Rows) {
+            # Create a dictionary of properties
+            $properties = @{}
+            for ($columnNum=0; $columnNum -lt $table.Columns.Count; $columnNum++) {
+                $properties[$table.Columns[$columnNum].name] = $row[$columnNum]
+            }
+            # Then create a PSObject from it. This seems to be *much* faster than using Add-Member
+            $objectView[$i] = (New-Object PSObject -Property $properties)
+            $null = $i++
+        }
+    }
+    $objectView
+}
+
+
+#Main 
+if(-not ($ServiceAccountUser -and $ServiceAccountPassword -and $Tenant -and $SubscriptionId -and $ResourceGroup -and $WorkspaceName ) ) {
+	$oAPI.LogScriptEvent($ScriptName,$EventID,1,"FATAL ERROR: Script requires all parameters and RunAs Account being associated with the SCOMAnalytics RunAs Profile.")
+	EXIT
+}
+
+$cred = New-Object System.Management.Automation.PSCredential -Argumentlist @($ServiceAccountUser,(ConvertTo-SecureString -String $ServiceAccountPassword -AsPlainText -Force))
+
+#Connect to azure
+Try{
+  #$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Connecting to azure ...")
+   Connect-AzureRmAccount -Credential $cred -ServicePrincipal -TenantId $Tenant
+}
+Catch{
+  $oAPI.LogScriptEvent($ScriptName,$EventID,1, "FATAL ERROR:Unable to connect to Azure.`n $error")
+  EXIT
+}
+
+#Load Kusto module
+#Try{
+  #$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Importing Kusto module ...")
+#  $SCOMResources = (get-itemproperty -path 'HKLM:\system\currentcontrolset\services\healthservice\Parameters' -Name 'State Directory').'State Directory' + '\Resources'
+#  $KustoModulePath = @(get-childitem -path $SCOMResources -Filter LogAnalyticsQuery.psm1 -Recurse)[0]
+#  Import-Module $KustoModulePath.PSPath
+#}
+#Catch{
+#  $oAPI.LogScriptEvent($ScriptName,$EventID,1, "FATAL ERROR:Unable to load kustomodule.`n $error")
+#  EXIT
+#}
+
+
+#Load SCOM SDK
+TRY{
+	#$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Importing SCOM module ...")
+	$SCOMPowerShellKey = "HKLM:\SOFTWARE\Microsoft\System Center Operations Manager\12\Setup\Powershell\V2"
+	$SCOMModulePath = Join-Path (Get-ItemProperty $SCOMPowerShellKey).InstallDirectory "OperationsManager"
+	Import-module $SCOMModulePath
+	New-DefaultManagementGroupConnection "localhost"
+}
+CATCH{
+  $oAPI.LogScriptEvent($ScriptName,$EventID,1,"FATAL ERROR: Unable to load OperationsManager module or unable to connect to Management Server")
+  EXIT
+}
+
+#Search Log Analytics
+Try{
+  $q = "Heartbeat | where TimeGenerated &gt; ago(3d) | summarize  max(TimeGenerated) by Computer, OSType, RemoteIPCountry"
+  #$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Performing query...")
+  $r = Invoke-LogAnalyticsQuery -WorkspaceName $WorkspaceName -SubscriptionId $SubscriptionId -ResourceGroup $ResourceGroup -Query $q
+
+}
+Catch{
+  $oAPI.LogScriptEvent($ScriptName,$EventID,1, "FATAL ERROR: Unable to search logAnalytics Workspace.`n  $error")
+  EXIT
+}
+
+if($r) {
+	$r.Results | % { 
+		  $strManagedComputer =  $_.Computer
+		  $oInstance = $oDiscoveryData.CreateClassInstance("$MPElement[Name='DEMO.Azure.LogAnalytics.ManagedDevice.Computer']$")
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/Tenant$",$Tenant)
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/SubscriptionId$",$SubscriptionId)
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/ResourceGroup$",$ResourceGroup)
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.Workspace']/WorkspaceName$",$WorkspaceName)
+		  $oInstance.AddProperty("$MPElement[Name='System!System.Entity']/DisplayName$", "Managed Computer: $($_.Computer)")
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.ManagedDevice']/DeviceName$",$_.Computer)
+		  $IsSCOMManaged = if(Get-SCOMClassInstance -name $_.Computer){$True}else{$False}
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.ManagedDevice.Computer']/IsSCOMManaged$",$IsSCOMManaged )
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.ManagedDevice.Computer']/IsSCOMManaged$",$IsSCOMManaged )
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.ManagedDevice.Computer']/OSType$",$_.OSType)
+		  $oInstance.AddProperty("$MPElement[Name='DEMO.Azure.LogAnalytics.ManagedDevice.Computer']/RemoteIPCountry$",$_.RemoteIPCountry )
+		  $oDiscoveryData.AddInstance($oInstance)
+
+	}
+}
+
+$oDiscoveryData
+
+$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Script Completed.`n Running as $(whoami).`n WS=$WorkspaceName , AppID=$ServiceAccountUser `n Script Runtime: $($sw.Elapsed.TotalSeconds) seconds.")
+
+</ScriptBody><Parameters><Parameter><Name>ServiceAccountUser</Name><Value>$RunAs[Name="DEMO.Azure.LogAnalytics.RunAsProfile"]/UserName$</Value></Parameter><Parameter><Name>ServiceAccountPassword</Name><Value>$RunAs[Name="DEMO.Azure.LogAnalytics.RunAsProfile"]/Password$</Value></Parameter><Parameter><Name>Tenant</Name><Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/Tenant$</Value></Parameter><Parameter><Name>SubscriptionId</Name><Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/SubscriptionId$</Value></Parameter><Parameter><Name>ResourceGroup</Name><Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/ResourceGroup$</Value></Parameter><Parameter><Name>WorkspaceName</Name><Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/WorkspaceName$</Value></Parameter></Parameters><TimeoutSeconds>300</TimeoutSeconds></DataSource>
+      </Discovery>
+      <Discovery ID="DEMO.Azure.LogAnalytics.PoolWatcher.Discovery" Enabled="true" Target="DEMO.Azure.LogAnalytics.Pool" ConfirmDelivery="false" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryClass TypeID="SC!Microsoft.SystemCenter.ManagementServicePoolWatcher">
+            <Property TypeID="System!System.Entity" PropertyID="DisplayName" />
+            <Property PropertyID="PoolId" />
+            <Property PropertyID="PoolName" />
+          </DiscoveryClass>
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="DEMO.Azure.LogAnalytics.PoolWatcher.Discovery.DS"><IntervalSeconds>86400</IntervalSeconds></DataSource>
+      </Discovery>
+      <Discovery ID="DEMO.Azure.LogAnalytics.WorkspacesManagedByPool.Discovery" Enabled="true" Target="DEMO.Azure.LogAnalytics.Pool" ConfirmDelivery="true" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryRelationship TypeID="SC!Microsoft.SystemCenter.ManagementActionPointShouldManageEntity" />
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="SC!Microsoft.SystemCenter.GroupPopulator"><RuleId>$MPElement$</RuleId><GroupInstanceId>$Target/Id$</GroupInstanceId><MembershipRules><MembershipRule><MonitoringClass>$MPElement[Name="DEMO.Azure.LogAnalytics.Workspace"]$</MonitoringClass><RelationshipClass>$MPElement[Name="SC!Microsoft.SystemCenter.ManagementActionPointShouldManageEntity"]$</RelationshipClass></MembershipRule></MembershipRules></DataSource>
+      </Discovery>
+      <Discovery ID="DEMO.Azure.LogAnalytics.Workspaces.Discovery" Enabled="true" Target="DEMO.Azure.LogAnalytics.Pool" ConfirmDelivery="false" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryClass TypeID="DEMO.Azure.LogAnalytics.Workspace">
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="Tenant" />
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="SubscriptionId" />
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="ResourceGroup" />
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="WorkspaceName" />
+          </DiscoveryClass>
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="DEMO.Azure.LogAnalytics.Workspaces.Discovery.DS"><IntervalSeconds>900</IntervalSeconds><Configuration>[{ "Tenant":"72f988bf-86f1-41af-91ab-2d7cd011db47", "SubscriptionId":"1172971a-ccfb-4d6b-9baf-0308b278a40c", "ResourceGroup":"mms-weu", "WorkspaceName":"contosows02"},{"Tenant":"6c6597d8-f261-4b6c-b960-8f5d28ca5ab1", "SubscriptionId":"e75174d6-3de8-43e4-a7f6-ebb2a0c2a0de", "ResourceGroup":"Management", "WorkspaceName":"LogAnaltics01"}]</Configuration></DataSource>
+      </Discovery>
+    </Discoveries>
+  </Monitoring>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Pool">
+          <Name>Azure Log Analytics Pool</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace">
+          <Name>Azure Log Analytics Workspace</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="Tenant">
+          <Name>Azure AD Tenant</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="SubscriptionId">
+          <Name>Subscription</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="ResourceGroup">
+          <Name>Resource Group</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="WorkspaceName">
+          <Name>Log Analytics Workspace Name</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice">
+          <Name>Azure Log Analytics Managed Device</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice" SubElementID="DeviceName">
+          <Name>Device Name</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer">
+          <Name>Azure Log Analytics Managed Computer</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" SubElementID="IsSCOMManaged">
+          <Name>Managed by SCOM</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" SubElementID="OSType">
+          <Name>Operating System</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" SubElementID="RemoteIPCountry">
+          <Name>Remote IP Country</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace.Hosts.ManagedDevices">
+          <Name>Azure Log Analytics Workspace Hosts Managed Device</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ComputerManagedDevice.Discovery">
+          <Name>Azure Log Analytics Computer Managed Device Discovery</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.PoolWatcher.Discovery">
+          <Name>Azure Log Analytics Pool Watcher Discovery</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.WorkspacesManagedByPool.Discovery">
+          <Name>Azure Log Analytics Workspaces Managed By Pool Discovery</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspaces.Discovery">
+          <Name>Azure Log Analytics Workspace Discovery</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics">
+          <Name>DEMO Azure Log Analytics</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.RunAsProfile">
+          <Name>Azure Log Analytics RunAs Profile</Name>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPack>

@@ -1,0 +1,67 @@
+﻿<ManagementPackFragment SchemaVersion="2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <TypeDefinitions>
+    <ModuleTypes>
+      <DataSourceModuleType ID="DEMO.Azure.LogAnalytics.Workspaces.Discovery.DS" Accessibility="Public" Batching="false">
+        <Configuration>
+          <xsd:element name="IntervalSeconds" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element name="Configuration" type="xsd:string" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="Configuration" Selector="$Config/Configuration$" ParameterType="string" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.TimedPowerShell.DiscoveryProvider">
+                <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+                <SyncTime />
+                <ScriptName>discoverWorspaces.ps1</ScriptName>
+                <ScriptBody>$IncludeFileContent/scripts/discoverWorspaces.ps1$</ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>Configuration</Name>
+                    <Value>$Config/Configuration$</Value>
+                  </Parameter>
+                </Parameters>
+                <TimeoutSeconds>300</TimeoutSeconds>
+              </DataSource>
+            </MemberModules>
+            <Composition>
+              <Node ID="DS" />
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.Discovery.Data</OutputType>
+      </DataSourceModuleType>
+    </ModuleTypes>
+  </TypeDefinitions>
+  <Monitoring>
+    <Discoveries>
+      <Discovery ID="DEMO.Azure.LogAnalytics.Workspaces.Discovery" Target="DEMO.Azure.LogAnalytics.Pool" Enabled="true" ConfirmDelivery="false" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryClass TypeID="DEMO.Azure.LogAnalytics.Workspace">
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="Tenant" />
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="SubscriptionId" />
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="ResourceGroup" />
+            <Property TypeID="DEMO.Azure.LogAnalytics.Workspace" PropertyID="WorkspaceName" />
+          </DiscoveryClass>
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="DEMO.Azure.LogAnalytics.Workspaces.Discovery.DS">
+          <IntervalSeconds>900</IntervalSeconds>
+          <Configuration>[{ "Tenant":"72f988bf-86f1-41af-91ab-2d7cd011db47", "SubscriptionId":"1172971a-ccfb-4d6b-9baf-0308b278a40c", "ResourceGroup":"mms-weu", "WorkspaceName":"contosows02"},{"Tenant":"6c6597d8-f261-4b6c-b960-8f5d28ca5ab1", "SubscriptionId":"e75174d6-3de8-43e4-a7f6-ebb2a0c2a0de", "ResourceGroup":"Management", "WorkspaceName":"LogAnaltics01"}]</Configuration>
+        </DataSource>
+      </Discovery>
+    </Discoveries>
+  </Monitoring>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspaces.Discovery">
+          <Name>Azure Log Analytics Workspace Discovery</Name>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPackFragment>

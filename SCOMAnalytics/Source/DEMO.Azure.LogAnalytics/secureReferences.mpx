@@ -1,0 +1,17 @@
+﻿<ManagementPackFragment SchemaVersion="2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <TypeDefinitions>
+    <SecureReferences>
+      <SecureReference ID="DEMO.Azure.LogAnalytics.RunAsProfile" Accessibility="Public" Context="DEMO.Azure.LogAnalytics.Workspace" />
+    </SecureReferences>
+  </TypeDefinitions>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.RunAsProfile">
+          <Name>Azure Log Analytics RunAs Profile</Name>
+          <Description/>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPackFragment>

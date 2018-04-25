@@ -1,0 +1,54 @@
+﻿<ManagementPackFragment SchemaVersion="2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Monitoring>
+    <Discoveries>
+      <Discovery ID="DEMO.Azure.LogAnalytics.ComputerManagedDevice.Discovery" Enabled="true" Target="DEMO.Azure.LogAnalytics.Workspace" ConfirmDelivery="true" Remotable="true" Priority="Normal">
+        <Category>Discovery</Category>
+        <DiscoveryTypes>
+          <DiscoveryClass TypeID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" />
+        </DiscoveryTypes>
+        <DataSource ID="DS" TypeID="Windows!Microsoft.Windows.TimedPowerShell.DiscoveryProvider">
+          <IntervalSeconds>900</IntervalSeconds>
+          <SyncTime />
+          <ScriptName>discoverComputerManagedDevice.ps1</ScriptName>
+          <ScriptBody>$IncludeFileContent/scripts/discoverComputerManagedDevice.ps1$</ScriptBody>
+          <Parameters>
+            <Parameter>
+              <Name>ServiceAccountUser</Name>
+              <Value>$RunAs[Name="DEMO.Azure.LogAnalytics.RunAsProfile"]/UserName$</Value>
+            </Parameter>
+            <Parameter>
+              <Name>ServiceAccountPassword</Name>
+              <Value>$RunAs[Name="DEMO.Azure.LogAnalytics.RunAsProfile"]/Password$</Value>
+            </Parameter>
+            <Parameter>
+              <Name>Tenant</Name>
+              <Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/Tenant$</Value>
+            </Parameter>
+            <Parameter>
+              <Name>SubscriptionId</Name>
+              <Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/SubscriptionId$</Value>
+            </Parameter>
+            <Parameter>
+              <Name>ResourceGroup</Name>
+              <Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/ResourceGroup$</Value>
+            </Parameter>
+            <Parameter>
+              <Name>WorkspaceName</Name>
+              <Value>$Target/Property[Type="DEMO.Azure.LogAnalytics.Workspace"]/WorkspaceName$</Value>
+            </Parameter>
+          </Parameters>
+          <TimeoutSeconds>300</TimeoutSeconds>
+        </DataSource>
+      </Discovery>
+    </Discoveries>
+  </Monitoring>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ComputerManagedDevice.Discovery">
+          <Name>Azure Log Analytics Computer Managed Device Discovery</Name>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPackFragment>

@@ -1,0 +1,7 @@
+genericModules.mpx*DEMO.Azure.LogAnalytics.Query.DS*4*8*DataSourceModuleType
+queryMissingHeartbeats.mpx*DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.MonitorType*4*8*UnitMonitorType
+queryMissingHeartbeats.mpx*DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.Monitor*169*8*UnitMonitor
+queryMissingHeartbeats.mpx*DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID*196*8*StringResource
+ManagementPack.mpx*DEMO.Azure.LogAnalytics.Monitors*5*10*DisplayString
+queryMissingHeartbeats.mpx*DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID*202*10*DisplayString
+queryMissingHeartbeats.mpx*DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.Monitor*206*10*DisplayString

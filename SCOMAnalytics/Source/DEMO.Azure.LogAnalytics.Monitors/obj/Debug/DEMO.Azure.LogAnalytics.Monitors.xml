@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ManagementPack SchemaVersion="2.0" ContentReadable="true" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Manifest>
+    <Identity>
+      <ID>DEMO.Azure.LogAnalytics.Monitors</ID>
+      <Version>1.0.0.5</Version>
+    </Identity>
+    <Name>DEMO.Azure.LogAnalytics.Monitors</Name>
+    <References>
+      <Reference Alias="Windows">
+        <ID>Microsoft.Windows.Library</ID>
+        <Version>7.5.8501.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="Health">
+        <ID>System.Health.Library</ID>
+        <Version>7.0.8433.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="System">
+        <ID>System.Library</ID>
+        <Version>7.5.8501.0</Version>
+        <PublicKeyToken>31bf3856ad364e35</PublicKeyToken>
+      </Reference>
+      <Reference Alias="AzureLogAnalytics">
+        <ID>DEMO.Azure.LogAnalytics</ID>
+        <Version>1.0.0.56</Version>
+        <PublicKeyToken>5da4468e48113a49</PublicKeyToken>
+      </Reference>
+    </References>
+  </Manifest>
+  <TypeDefinitions>
+    <ModuleTypes>
+      <DataSourceModuleType ID="DEMO.Azure.LogAnalytics.Query.DS" Accessibility="Internal" Batching="false">
+        <Configuration>
+          <xsd:element minOccurs="1" type="xsd:integer" name="IntervalSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:integer" name="TimeoutSeconds" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="0" type="xsd:string" name="SyncTime" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" type="xsd:string" name="Query" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="TimeoutSeconds" Selector="$Config/TimeoutSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="SyncTime" Selector="$Config/SyncTime$" ParameterType="string" />
+        </OverrideableParameters>
+        <ModuleImplementation Isolation="Any">
+          <Composite>
+            <MemberModules>
+              <DataSource ID="Scheduler" TypeID="System!System.SimpleScheduler">
+                <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+                <SyncTime>$Config/SyncTime$</SyncTime>
+              </DataSource>
+              <ProbeAction ID="Probe" TypeID="Windows!Microsoft.Windows.PowerShellPropertyBagTriggerOnlyProbe">
+                <ScriptName>logAnalyticsQuery.ps1</ScriptName>
+                <ScriptBody><![CDATA[Param($ServiceAccountUser, $ServiceAccountPassword,$Tenant,$SubscriptionId,$ResourceGroup,$WorkspaceName,$Query)
+
+$ScriptName = "logAnalyticsQuery.ps1"
+$EventID = "11116"
+$oAPI = New-Object -ComObject 'MOM.ScriptAPI'
+$sw = New-Object Diagnostics.Stopwatch
+$sw.Start()
+#$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Script is starting.`n Running as $(whoami).`n WS=$WorkspaceName , AppID=$ServiceAccountUser")
+
+#Functions from LogAnalytics Module
+
+function Invoke-LogAnalyticsQuery ($WorkspaceName,$SubscriptionId,$ResourceGroup,$Query){
+
+    $ErrorActionPreference = "Stop"
+    $accessToken = GetAccessToken
+	$uri =  "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/microsoft.operationalinsights/workspaces/$workspaceName/api/query?api-version=2017-01-01-preview"
+	$Timespan = ""
+	$ServerTimeout = ""
+
+    $body = @{"query" = $Query;"timespan" = $Timespan} | ConvertTo-Json
+
+	$preferString = "response-v1=true"
+    if ($ServerTimeout -ne $null) {
+        $preferString += ",wait=$ServerTimeout"
+    }
+	$headers = @{
+        "Authorization" = "Bearer $accessToken";
+        "prefer" = $preferString;
+        "x-ms-app" = "LogAnalyticsQuery.psm1";
+        "x-ms-client-request-id" = [Guid]::NewGuid().ToString();
+    }
+
+    $response = Invoke-WebRequest -UseBasicParsing -Uri $uri -Body $body -ContentType "application/json" -Headers $headers -Method Post
+
+    if ($response.StatusCode -ne 200 -and $response.StatusCode -ne 204) {
+        $statusCode = $response.StatusCode
+        $reasonPhrase = $response.StatusDescription
+        $message = $response.Content
+        throw "Failed to execute query.`nStatus Code: $statusCode`nReason: $reasonPhrase`nMessage: $message"
+    }
+
+    $oData = $response.Content | ConvertFrom-Json
+
+    $result = New-Object PSObject
+    $result | Add-Member -MemberType NoteProperty -Name Response -Value $response
+
+    # In this case, we only need the response member set and we can bail out
+    if ($response.StatusCode -eq 204) {
+        $result
+        return
+    }
+
+    $objectView = CreateObjectView  $oData
+    $result | Add-Member -MemberType NoteProperty -Name Results -Value $objectView
+    $result
+}
+
+function GetAccessToken {
+    $azureCmdlet = get-command -Name Get-AzureRMContext -ErrorAction SilentlyContinue
+    if ($azureCmdlet -eq $null)
+    {
+        $null = Import-Module AzureRM -ErrorAction Stop;
+    }
+    $AzureContext = & "Get-AzureRmContext" -ErrorAction Stop;
+    $authenticationFactory = New-Object -TypeName Microsoft.Azure.Commands.Common.Authentication.Factories.AuthenticationFactory
+    if ((Get-Variable -Name PSEdition -ErrorAction Ignore) -and ('Core' -eq $PSEdition)) {
+        [Action[string]]$stringAction = {param($s)}
+        $serviceCredentials = $authenticationFactory.GetServiceClientCredentials($AzureContext, $stringAction)
+    } else {
+        $serviceCredentials = $authenticationFactory.GetServiceClientCredentials($AzureContext)
+    }
+
+    # We can't get a token directly from the service credentials. Instead, we need to make a dummy message which we will ask
+    # the serviceCredentials to add an auth token to, then we can take the token from this message.
+    $message = New-Object System.Net.Http.HttpRequestMessage -ArgumentList @([System.Net.Http.HttpMethod]::Get, "http://foobar/")
+    $cancellationToken = New-Object System.Threading.CancellationToken
+    $null = $serviceCredentials.ProcessHttpRequestAsync($message, $cancellationToken).GetAwaiter().GetResult()
+    $accessToken = $message.Headers.GetValues("Authorization").Split(" ")[1] # This comes out in the form "Bearer <token>"
+
+    $accessToken
+}
+
+function CreateObjectView($oData) {
+
+    # Find the number of entries we'll need in this array
+    $count = 0
+    foreach ($table in $oData.Tables) {
+        $count += $table.Rows.Count
+    }
+
+    $objectView = New-Object object[] $count
+    $i = 0;
+    foreach ($table in $oData.Tables) {
+        foreach ($row in $table.Rows) {
+            # Create a dictionary of properties
+            $properties = @{}
+            for ($columnNum=0; $columnNum -lt $table.Columns.Count; $columnNum++) {
+                $properties[$table.Columns[$columnNum].name] = $row[$columnNum]
+            }
+            # Then create a PSObject from it. This seems to be *much* faster than using Add-Member
+            $objectView[$i] = (New-Object PSObject -Property $properties)
+            $null = $i++
+        }
+    }
+    $objectView
+}
+
+
+if(-not ($ServiceAccountUser -and $ServiceAccountPassword -and $Tenant -and $SubscriptionId -and $ResourceGroup -and $WorkspaceName ) ) {
+		$oAPI.LogScriptEvent($ScriptName,$EventID,1,"FATAL ERROR: Script requires all parameters and RunAs Account being associated with the SCOMAnalytics RunAs Profile.")
+	EXIT
+}
+
+
+$cred = New-Object System.Management.Automation.PSCredential -Argumentlist @($ServiceAccountUser,(ConvertTo-SecureString -String $ServiceAccountPassword -AsPlainText -Force))
+
+#Connect to azure
+Try{
+  #$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Connecting to azure ...")
+  Connect-AzureRmAccount -Credential $cred -ServicePrincipal -TenantId $tenant
+}
+Catch{
+  $oAPI.LogScriptEvent($ScriptName,$EventID,1, "FATAL ERROR:Unable to connect to Azure.`n $error")
+  EXIT
+}
+
+#Load Kusto module
+#Try{
+#  #$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Importing Kusto module ...")
+#  $SCOMResources = (get-itemproperty -path 'HKLM:\system\currentcontrolset\services\healthservice\Parameters' -Name 'State Directory').'State Directory' + '\Resources'
+#  $KustoModulePath = @(get-childitem -path $SCOMResources -Filter LogAnalyticsQuery.psm1 -Recurse)[0]
+#  Import-Module $KustoModulePath.PSPath
+#}
+#Catch{
+#  $oAPI.LogScriptEvent($ScriptName,$EventID,1, "FATAL ERROR:Unable to load kustomodule.`n $error")
+#  EXIT
+#}
+
+#Search Log Analytics
+Try{
+  #$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Performing query...")
+  $r = Invoke-LogAnalyticsQuery -WorkspaceName $WorkspaceName -SubscriptionId $SubscriptionId -ResourceGroup $ResourceGroup -Query $Query
+}
+Catch{
+  $oAPI.LogScriptEvent($ScriptName,$EventID,1, "FATAL ERROR: Unable to search logAnalytics Workspace.`n  $error")
+  EXIT
+}
+
+
+if($r) {
+	$r.Results | % { 
+		$bag = $oAPI.CreatePropertyBag()
+		$_.PSObject.Properties | %{ 
+			$bag.AddValue("$($_.Name)",$_.Value)
+		}
+		$bag
+	}
+}
+
+$oAPI.LogScriptEvent($ScriptName,$EventID,0,"Script Completed.`n Running as $(whoami).`n WS=$WorkspaceName , AppID=$ServiceAccountUser `n Script Runtime: $($sw.Elapsed.TotalSeconds) seconds.")
+
+]]></ScriptBody>
+                <Parameters>
+                  <Parameter>
+                    <Name>ServiceAccountUser</Name>
+                    <Value>$RunAs[Name="AzureLogAnalytics!DEMO.Azure.LogAnalytics.RunAsProfile"]/UserName$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>ServiceAccountPassword</Name>
+                    <Value>$RunAs[Name="AzureLogAnalytics!DEMO.Azure.LogAnalytics.RunAsProfile"]/Password$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>Tenant</Name>
+                    <Value>$Target/Host/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.Workspace"]/Tenant$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>SubscriptionId</Name>
+                    <Value>$Target/Host/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.Workspace"]/SubscriptionId$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>ResourceGroup</Name>
+                    <Value>$Target/Host/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.Workspace"]/ResourceGroup$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>WorkspaceName</Name>
+                    <Value>$Target/Host/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.Workspace"]/WorkspaceName$</Value>
+                  </Parameter>
+                  <Parameter>
+                    <Name>Query</Name>
+                    <Value>$Config/Query$</Value>
+                  </Parameter>
+                </Parameters>
+                <TimeoutSeconds>$Config/TimeoutSeconds$</TimeoutSeconds>
+              </ProbeAction>
+            </MemberModules>
+            <Composition>
+              <Node ID="Probe">
+                <Node ID="Scheduler" />
+              </Node>
+            </Composition>
+          </Composite>
+        </ModuleImplementation>
+        <OutputType>System!System.PropertyBagData</OutputType>
+      </DataSourceModuleType>
+    </ModuleTypes>
+    <MonitorTypes>
+      <UnitMonitorType ID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.MonitorType" Accessibility="Public">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="Critical" NoDetection="false" />
+          <MonitorTypeState ID="Warning" NoDetection="false" />
+          <MonitorTypeState ID="Healthy" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+          <xsd:element minOccurs="1" name="IntervalSeconds" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" name="NumberOfSecondsForWarning" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+          <xsd:element minOccurs="1" name="NumberOfSecondsForCritical" type="xsd:integer" xmlns:xsd="http://www.w3.org/2001/XMLSchema" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="NumberOfSecondsForWarning" Selector="$Config/NumberOfSecondsForCritical$" ParameterType="int" />
+          <OverrideableParameter ID="NumberOfSecondsForCritical" Selector="$Config/NumberOfSecondsForCritical$" ParameterType="int" />
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="DEMO.Azure.LogAnalytics.Query.DS">
+              <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+              <TimeoutSeconds>100</TimeoutSeconds>
+              <SyncTime />
+              <Query>
+                
+Heartbeat
+| where TimeGenerated &gt; ago(3d)
+| summarize LastHeartbeat = max(TimeGenerated) by Computer
+| where isnotempty(Computer)
+| extend LastHeartbeatSec = toint((now() - LastHeartbeat) / 1s)
+</Query>
+            </DataSource>
+            <ConditionDetection ID="CDCritical" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <And>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>Equal</Operator>
+                      <ValueExpression>
+                        <Value Type="String">$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>Greater</Operator>
+                      <ValueExpression>
+                        <Value Type="Integer">$Config/NumberOfSecondsForCritical$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                </And>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="CDWarning" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <Or>
+                  <Expression>
+                    <And>
+                      <Expression>
+                        <SimpleExpression>
+                          <ValueExpression>
+                            <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                          </ValueExpression>
+                          <Operator>Equal</Operator>
+                          <ValueExpression>
+                            <Value Type="String">$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</Value>
+                          </ValueExpression>
+                        </SimpleExpression>
+                      </Expression>
+                      <Expression>
+                        <SimpleExpression>
+                          <ValueExpression>
+                            <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                          </ValueExpression>
+                          <Operator>Greater</Operator>
+                          <ValueExpression>
+                            <Value Type="Integer">$Config/NumberOfSecondsForWarning$</Value>
+                          </ValueExpression>
+                        </SimpleExpression>
+                      </Expression>
+                      <Expression>
+                        <SimpleExpression>
+                          <ValueExpression>
+                            <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                          </ValueExpression>
+                          <Operator>LessEqual</Operator>
+                          <ValueExpression>
+                            <Value Type="Integer">$Config/NumberOfSecondsForCritical$</Value>
+                          </ValueExpression>
+                        </SimpleExpression>
+                      </Expression>
+                    </And>
+                  </Expression>
+                  <Expression>
+                    <Not>
+                      <Expression>
+                        <Exists>
+                          <ValueExpression>
+                            <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                          </ValueExpression>
+                        </Exists>
+                      </Expression>
+                    </Not>
+                  </Expression>
+                </Or>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="CDHealthy" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <And>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>Equal</Operator>
+                      <ValueExpression>
+                        <Value Type="String">$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>LessEqual</Operator>
+                      <ValueExpression>
+                        <Value Type="Integer">$Config/NumberOfSecondsForWarning$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                </And>
+              </Expression>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="Critical">
+              <Node ID="CDCritical">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="Warning">
+              <Node ID="CDWarning">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="Healthy">
+              <Node ID="CDHealthy">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
+    </MonitorTypes>
+  </TypeDefinitions>
+  <Monitoring>
+    <Monitors>
+      <UnitMonitor ID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.Monitor" Accessibility="Public" Enabled="true" Target="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice.Computer" ParentMonitorID="Health!System.Health.AvailabilityState" Remotable="true" Priority="Normal" TypeID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID">
+          <AlertOnState>Error</AlertOnState>
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>
+          <AlertParameters>
+            <AlertParameter1>$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</AlertParameter1>
+            <AlertParameter2>$Data/Context/Property[@Name="LastHeartbeatSec"]$</AlertParameter2>
+          </AlertParameters>
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="MissingHeartbeats_Critical" MonitorTypeStateID="Critical" HealthState="Error" />
+          <OperationalState ID="MissingHeartbeats_Warning" MonitorTypeStateID="Warning" HealthState="Warning" />
+          <OperationalState ID="MissingHeartbeats_Healthy" MonitorTypeStateID="Healthy" HealthState="Success" />
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>300</IntervalSeconds>
+          <NumberOfSecondsForWarning>350</NumberOfSecondsForWarning>
+          <NumberOfSecondsForCritical>600</NumberOfSecondsForCritical>
+        </Configuration>
+      </UnitMonitor>
+    </Monitors>
+  </Monitoring>
+  <Presentation>
+    <StringResources>
+      <StringResource ID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID" />
+    </StringResources>
+  </Presentation>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Monitors">
+          <Name>DEMO Azure Log Analytics Monitors</Name>
+          <Description />
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID">
+          <Name>Azure Log Analytics: Computer Missing Heartbeats</Name>
+          <Description>Computer {0} is missing Heartbeats for the past {1} seconds</Description>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.Monitor">
+          <Name>Azure Log Analytics Missing Heartbeats Monitor</Name>
+          <Description />
+        </DisplayString>
+      </DisplayStrings>
+      <KnowledgeArticles></KnowledgeArticles>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPack>

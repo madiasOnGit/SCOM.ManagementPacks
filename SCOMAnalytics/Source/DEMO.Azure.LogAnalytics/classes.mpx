@@ -1,0 +1,74 @@
+﻿<ManagementPackFragment SchemaVersion="2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <TypeDefinitions>
+    <EntityTypes>
+      <ClassTypes>
+        <ClassType ID="DEMO.Azure.LogAnalytics.Workspace" Accessibility="Public" Abstract="false" Base="System!System.LogicalEntity" Hosted="false" Singleton="false" Extension="false">
+          <Property ID="Tenant" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="SubscriptionId" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="ResourceGroup" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="WorkspaceName" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+        </ClassType>
+        <ClassType ID="DEMO.Azure.LogAnalytics.ManagedDevice" Accessibility="Public" Abstract="false" Base="System!System.ApplicationComponent" Hosted="true" Singleton="false" Extension="false">
+          <Property ID="DeviceName" Type="string" AutoIncrement="false" Key="true" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+        </ClassType>
+        <ClassType ID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" Accessibility="Public" Abstract="false" Base="DEMO.Azure.LogAnalytics.ManagedDevice" Hosted="true" Singleton="false" Extension="false">
+          <Property ID="IsSCOMManaged" Type="bool" AutoIncrement="false" Key="false" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="OSType" Type="string" AutoIncrement="false" Key="false" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+          <Property ID="RemoteIPCountry" Type="string" AutoIncrement="false" Key="false" CaseSensitive="false" MaxLength="256" MinLength="0" Required="false" Scale="0" />
+        </ClassType>
+        <ClassType ID="DEMO.Azure.LogAnalytics.Pool" Accessibility="Public" Abstract="false" Base="SC!Microsoft.SystemCenter.ManagementServicePool" Hosted="false" Singleton="true" Extension="false" />  
+      </ClassTypes>
+      <RelationshipTypes>
+        <RelationshipType ID="DEMO.Azure.LogAnalytics.Workspace.Hosts.ManagedDevices" Accessibility="Public" Abstract="false" Base="System!System.Hosting">
+          <Source ID="Source" MinCardinality="0" MaxCardinality="2147483647" Type="DEMO.Azure.LogAnalytics.Workspace" />
+          <Target ID="Target" MinCardinality="0" MaxCardinality="2147483647" Type="DEMO.Azure.LogAnalytics.ManagedDevice" />
+        </RelationshipType>
+      </RelationshipTypes>
+    </EntityTypes>
+  </TypeDefinitions>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Pool">
+          <Name>Azure Log Analytics Pool</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace">
+          <Name>Azure Log Analytics Workspace</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="Tenant">
+          <Name>Azure AD Tenant</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="SubscriptionId">
+          <Name>Subscription</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="ResourceGroup">
+          <Name>Resource Group</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace" SubElementID="WorkspaceName">
+          <Name>Log Analytics Workspace Name</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice">
+          <Name>Azure Log Analytics Managed Device</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice" SubElementID="DeviceName">
+          <Name>Device Name</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer">
+          <Name>Azure Log Analytics Managed Computer</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" SubElementID="IsSCOMManaged">
+          <Name>Managed by SCOM</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" SubElementID="OSType">
+          <Name>Operating System</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.ManagedDevice.Computer" SubElementID="RemoteIPCountry">
+          <Name>Remote IP Country</Name>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Workspace.Hosts.ManagedDevices">
+          <Name>Azure Log Analytics Workspace Hosts Managed Device</Name>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+</ManagementPackFragment>

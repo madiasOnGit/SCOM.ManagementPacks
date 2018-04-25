@@ -1,0 +1,213 @@
+﻿<ManagementPackFragment SchemaVersion="2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <TypeDefinitions>
+    <MonitorTypes>
+      <UnitMonitorType ID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.MonitorType" Accessibility="Public">
+        <MonitorTypeStates>
+          <MonitorTypeState ID="Critical" NoDetection="false" />
+          <MonitorTypeState ID="Warning" NoDetection="false" />
+          <MonitorTypeState ID="Healthy" NoDetection="false" />
+        </MonitorTypeStates>
+        <Configuration>
+          <xsd:element minOccurs="1" name="IntervalSeconds" type="xsd:integer" />
+          <xsd:element minOccurs="1" name="NumberOfSecondsForWarning" type="xsd:integer" />
+          <xsd:element minOccurs="1" name="NumberOfSecondsForCritical" type="xsd:integer" />
+        </Configuration>
+        <OverrideableParameters>
+          <OverrideableParameter ID="IntervalSeconds" Selector="$Config/IntervalSeconds$" ParameterType="int" />
+          <OverrideableParameter ID="NumberOfSecondsForWarning" Selector="$Config/NumberOfSecondsForCritical$" ParameterType="int" />
+          <OverrideableParameter ID="NumberOfSecondsForCritical" Selector="$Config/NumberOfSecondsForCritical$" ParameterType="int" />
+        </OverrideableParameters>
+        <MonitorImplementation>
+          <MemberModules>
+            <DataSource ID="DS" TypeID="DEMO.Azure.LogAnalytics.Query.DS">
+              <IntervalSeconds>$Config/IntervalSeconds$</IntervalSeconds>
+              <TimeoutSeconds>100</TimeoutSeconds>
+              <SyncTime/>
+              <Query>
+                <![CDATA[
+Heartbeat
+| where TimeGenerated > ago(3d)
+| summarize LastHeartbeat = max(TimeGenerated) by Computer
+| where isnotempty(Computer)
+| extend LastHeartbeatSec = toint((now() - LastHeartbeat) / 1s)
+]]></Query>
+            </DataSource>
+            <ConditionDetection ID="CDCritical" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <And>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>Equal</Operator>
+                      <ValueExpression>
+                        <Value Type="String">$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>Greater</Operator>
+                      <ValueExpression>
+                        <Value Type="Integer">$Config/NumberOfSecondsForCritical$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                </And>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="CDWarning" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <Or>
+                  <Expression>
+                      <And>
+                        <Expression>
+                          <SimpleExpression>
+                            <ValueExpression>
+                              <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                            </ValueExpression>
+                            <Operator>Equal</Operator>
+                            <ValueExpression>
+                              <Value Type="String">$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</Value>
+                            </ValueExpression>
+                          </SimpleExpression>
+                        </Expression>
+                        <Expression>
+                          <SimpleExpression>
+                            <ValueExpression>
+                              <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                            </ValueExpression>
+                            <Operator>Greater</Operator>
+                            <ValueExpression>
+                              <Value Type="Integer">$Config/NumberOfSecondsForWarning$</Value>
+                            </ValueExpression>
+                          </SimpleExpression>
+                        </Expression>
+                        <Expression>
+                          <SimpleExpression>
+                            <ValueExpression>
+                              <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                            </ValueExpression>
+                            <Operator>LessEqual</Operator>
+                            <ValueExpression>
+                              <Value Type="Integer">$Config/NumberOfSecondsForCritical$</Value>
+                            </ValueExpression>
+                          </SimpleExpression>
+                        </Expression>
+                      </And>
+                  </Expression>
+                  <Expression>
+                   <Not>
+                       <Expression>
+                             <Exists>
+                                    <ValueExpression>
+                                           <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                                    </ValueExpression>
+                             </Exists>
+                      </Expression>
+                  </Not>
+               </Expression>
+                </Or>
+              </Expression>
+            </ConditionDetection>
+            <ConditionDetection ID="CDHealthy" TypeID="System!System.ExpressionFilter">
+              <Expression>
+                <And>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="String">Property[@Name='Computer']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>Equal</Operator>
+                      <ValueExpression>
+                        <Value Type="String">$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                  <Expression>
+                    <SimpleExpression>
+                      <ValueExpression>
+                        <XPathQuery Type="Integer">Property[@Name='LastHeartbeatSec']</XPathQuery>
+                      </ValueExpression>
+                      <Operator>LessEqual</Operator>
+                      <ValueExpression>
+                        <Value Type="Integer">$Config/NumberOfSecondsForWarning$</Value>
+                      </ValueExpression>
+                    </SimpleExpression>
+                  </Expression>
+                </And>
+              </Expression>
+            </ConditionDetection>
+          </MemberModules>
+          <RegularDetections>
+            <RegularDetection MonitorTypeStateID="Critical">
+              <Node ID="CDCritical">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+            <RegularDetection MonitorTypeStateID="Warning">
+                <Node ID="CDWarning">
+                  <Node ID="DS" />
+                </Node>
+              </RegularDetection>
+            <RegularDetection MonitorTypeStateID="Healthy">
+              <Node ID="CDHealthy">
+                <Node ID="DS" />
+              </Node>
+            </RegularDetection>
+          </RegularDetections>
+        </MonitorImplementation>
+      </UnitMonitorType>
+    </MonitorTypes>
+  </TypeDefinitions>
+  <Monitoring>
+    <Monitors>
+      <UnitMonitor ID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.Monitor" Accessibility="Public" Enabled="true" Target="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice.Computer" ParentMonitorID="Health!System.Health.AvailabilityState" Remotable="true" Priority="Normal"  TypeID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.MonitorType" ConfirmDelivery="true">
+        <Category>AvailabilityHealth</Category>
+        <AlertSettings AlertMessage="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID">
+          <AlertOnState>Error</AlertOnState>
+          <AutoResolve>true</AutoResolve>
+          <AlertPriority>Normal</AlertPriority>
+          <AlertSeverity>MatchMonitorHealth</AlertSeverity>
+          <AlertParameters>
+            <AlertParameter1>$Target/Property[Type="AzureLogAnalytics!DEMO.Azure.LogAnalytics.ManagedDevice"]/DeviceName$</AlertParameter1>
+            <AlertParameter2>$Data/Context/Property[@Name="LastHeartbeatSec"]$</AlertParameter2>
+          </AlertParameters>
+        </AlertSettings>
+        <OperationalStates>
+          <OperationalState ID="MissingHeartbeats_Critical" MonitorTypeStateID="Critical" HealthState="Error" />
+          <OperationalState ID="MissingHeartbeats_Warning" MonitorTypeStateID="Warning" HealthState="Warning" />
+          <OperationalState ID="MissingHeartbeats_Healthy" MonitorTypeStateID="Healthy" HealthState="Success" />
+        </OperationalStates>
+        <Configuration>
+          <IntervalSeconds>300</IntervalSeconds>
+          <NumberOfSecondsForWarning>350</NumberOfSecondsForWarning>
+          <NumberOfSecondsForCritical>600</NumberOfSecondsForCritical>
+        </Configuration>
+      </UnitMonitor>
+    </Monitors>
+  </Monitoring>
+  <Presentation>
+    <StringResources>
+      <StringResource ID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID" />
+    </StringResources>
+  </Presentation>
+  <LanguagePacks>
+    <LanguagePack ID="ENU" IsDefault="true">
+      <DisplayStrings>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.AlertMessageResourceID">
+          <Name>Azure Log Analytics: Computer Missing Heartbeats</Name>
+          <Description>Computer {0} is missing Heartbeats for the past {1} seconds</Description>
+        </DisplayString>
+        <DisplayString ElementID="DEMO.Azure.LogAnalytics.Query.MissingHeartbeats.Monitor">
+          <Name>Azure Log Analytics Missing Heartbeats Monitor</Name>
+          <Description/>
+        </DisplayString>
+      </DisplayStrings>
+    </LanguagePack>
+  </LanguagePacks>
+    </ManagementPackFragment>
